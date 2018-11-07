@@ -27,16 +27,21 @@ class GitManager {
     }
 
     static GitCommit getLastCommit() throws IOException {
-        return loadCommit(
-                new CommitHash(fileContentFromPath(Paths.get(gitBranchesPath.getFileName() + File.separator + getHead()))));
+        Path lastCommitPath = Paths.get(gitBranchesPath + File.separator + getHead());
+        String lastCommitContent = fileContentFromPath(lastCommitPath);
+        return loadCommit(new CommitHash(lastCommitContent));
     }
 
     static String getLastCommitSHA() throws IOException, NoSuchAlgorithmException {
-        return saveCommit(getLastCommit()).sha1;
+        GitCommit lastCommit = getLastCommit();
+        if (lastCommit == null){
+            return null;
+        }
+        return saveCommit(lastCommit).sha1;
     }
 
     static void setLastCommit(GitCommit gitCommit) throws IOException, NoSuchAlgorithmException {
-        writeToFile(Paths.get(gitBranchesPath.getFileName() + File.separator + getHead()), saveCommit(gitCommit).sha1);
+        writeToFile(Paths.get(gitBranchesPath + File.separator + getHead()), saveCommit(gitCommit).sha1);
 
     }
 
@@ -77,14 +82,15 @@ class GitManager {
         InputStream loadStream = load(treeHash.sha1);
         String treeString = stringFromInputStream(loadStream);
         GitTree gitTree = new GitTree();
-        Arrays.stream(treeString.split("\\r?\\n")).forEach(line -> {
-            int index = line.indexOf(' ');
-            int nextIndex = line.indexOf(' ', index + 1);
-            String name = line.substring(0, index);
-            String sha1 = line.substring(index + 1, nextIndex);
-            gitTree.filesMap.put(name, loadFile(new FileHash(sha1)));
-        });
 
+        if (!treeString.equals("")){
+            Arrays.stream(treeString.split("\\n")).forEach(line -> {
+                int index = line.indexOf(' ');
+                String name = line.substring(0, index);
+                String sha1 = line.substring(index + 1);
+                gitTree.filesMap.put(name, loadFile(new FileHash(sha1)));
+            });
+        }
         return gitTree;
 
     }
@@ -105,13 +111,13 @@ class GitManager {
     }
 
     static GitCommit loadCommit(CommitHash commitHash) throws IOException {
-        if (commitHash.sha1 == "null") {
+        if (commitHash.sha1.equals("null")) {
             return null;
         }
 
         InputStream commitStream = load(commitHash.sha1);
         String commitString = stringFromInputStream(commitStream);
-        String[] lines = commitString.split("\\r?\\n");
+        String[] lines = commitString.split("\\n");
         return new GitCommit(lines[0], lines[1], lines[2], loadTree(new TreeHash(lines[3])), loadCommit(new CommitHash(lines[4])));
     }
 
@@ -171,9 +177,9 @@ class GitManager {
     }
 
     private static InputStream load(String sha1) {
-        Path shaDirPath = Paths.get(gitObjectsPath.getFileSystem() + File.separator + sha1.substring(0, 2));
+        Path shaDirPath = Paths.get(gitObjectsPath + File.separator + sha1.substring(0, 2));
         if (Files.exists(shaDirPath) && Files.isDirectory(shaDirPath)) {
-            Path shaFilePath = Paths.get(shaDirPath.toString() + File.separator + sha1.substring(2));
+            Path shaFilePath = Paths.get(shaDirPath + File.separator + sha1.substring(2));
 
             if (Files.exists(shaFilePath) && !Files.isDirectory(shaFilePath)) {
                 try {
@@ -204,10 +210,10 @@ class GitManager {
         }
 
         sha1 = String.format("%040x", new BigInteger(1, digest.digest()));
-        Path shaDir = Paths.get(gitObjectsPath.getFileSystem() + File.separator + sha1.substring(0, 2));
+        Path shaDir = Paths.get(gitObjectsPath + File.separator + sha1.substring(0, 2));
 
         Files.createDirectories(shaDir);
-        Path shaFile = Paths.get(shaDir.toString() + File.separator + sha1.substring(2));
+        Path shaFile = Paths.get(shaDir + File.separator + sha1.substring(2));
         Files.write(shaFile, buffer);
 
         return sha1;

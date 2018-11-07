@@ -34,11 +34,11 @@ public class GitCommands {
             Files.createDirectories(gitBranchesPath);
             Files.createFile(gitHeadPath);
             writeToFile(gitHeadPath, "master");
-            Files.createFile(Paths.get(gitBranchesPath.getFileName() + File.separator + "master"));
-            writeToFile(Paths.get(gitBranchesPath.getFileName() + File.separator + "master"), "null");
+            Files.createFile(Paths.get(gitBranchesPath + File.separator + "master"));
+            writeToFile(Paths.get(gitBranchesPath + File.separator + "master"), "null");
             Files.createFile(gitStagingPath);
             setStaging(new GitTree());
-            System.out.println("Initializing completed successfully!");
+            System.out.println("Initialized empty Git repository in " + gitAppPath);
         } catch (IOException | NoSuchAlgorithmException e) {
             System.out.println("Error while initializing!");
         }
@@ -57,7 +57,8 @@ public class GitCommands {
         for (String fileName : fileNames) {
             String relativeFileName = new File(System.getProperty("user.dir")).toURI()
                     .relativize(new File(fileName).toURI()).getPath();
-            gitTree.filesMap.put(relativeFileName, new ByteArrayInputStream(Files.readAllBytes(Paths.get(relativeFileName))));
+            InputStream fileNameStream = new ByteArrayInputStream(Files.readAllBytes(Paths.get(relativeFileName)));
+            gitTree.filesMap.put(relativeFileName, fileNameStream);
         }
         setStaging(gitTree);
     }
@@ -100,6 +101,10 @@ public class GitCommands {
      * @throws IOException
      */
     static void status() throws IOException {
+        final String ANSI_RESET = "\u001B[0m";
+        final String ANSI_RED = "\u001B[91m";
+        final String ANSI_GREEN = "\u001B[92m";
+        final String ANSI_YELLOW = "\u001B[93m";
         System.out.println("On branch " + fileContentFromPath(gitHeadPath));
         GitTree gitTree = getStaging();
 
@@ -107,7 +112,7 @@ public class GitCommands {
                 .map(f -> new File(System.getProperty("user.dir")).toURI().relativize(f.toUri()).getPath())
                 .forEach(f -> {
                     if (!gitTree.filesMap.containsKey(f)) {
-                        System.out.println("New:\t" + f);
+                        System.out.println(ANSI_GREEN + "New:\t" + f + ANSI_RESET);
                     } else {
                         InputStream is = gitTree.filesMap.get(f);
                         String workdirContents = null;
@@ -123,13 +128,13 @@ public class GitCommands {
                             e.printStackTrace();
                         }
                         if (!workdirContents.equals(stagingContents)) {
-                            System.out.println("Modified:\t" + f);
+                            System.out.println(ANSI_YELLOW + "Modified:\t" + f + ANSI_RESET);
                         }
                         gitTree.filesMap.remove(f);
                     }
                 });
         for (String filename : gitTree.filesMap.keySet()) {
-            System.out.println("Deleted:\t" + filename);
+            System.out.println(ANSI_RED + "Deleted:\t" + filename + ANSI_RESET);
         }
     }
 
@@ -140,7 +145,12 @@ public class GitCommands {
      * @throws NoSuchAlgorithmException
      */
     static void log() throws IOException, NoSuchAlgorithmException {
-        log(getLastCommitSHA());
+        String lastCommitSHA = getLastCommitSHA();
+        if (lastCommitSHA == null) {
+            throw new IllegalArgumentException("your current branch "
+                    + getHead() + " does not have any commits yet");
+        }
+        log(lastCommitSHA);
     }
 
     /**
