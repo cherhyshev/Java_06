@@ -3,6 +3,7 @@ package ru.hse.spb;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Collections;
 
 
 public class GitApp {
@@ -50,10 +51,16 @@ public class GitApp {
                     GitCommands.listBranches();
                 } else if (args[1].equals("-d")) {
                     GitCommands.deleteBranchAndCheckoutToMaster(args[2]);
+                } else if (args[1].equals("-n")) {
+                    GitCommands.createNewBranchAndCheckout(args[2]);
+                } else {
+                    GitCommands.checkoutToBranch(args[1]);
                 }
+                break;
 
             case "merge":
                 GitCommands.merge(args[1]);
+                break;
 
 
             default:

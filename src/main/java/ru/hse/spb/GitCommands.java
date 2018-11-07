@@ -210,7 +210,7 @@ public class GitCommands {
         GitTree newWorkingTree = gitCommit.gitTree;
         setStaging(newWorkingTree);
         String currentBranch = getHead();
-        writeToFile(Paths.get(gitBranchesPath.getFileName() + File.separator + currentBranch), revision);
+        writeToFile(Paths.get(gitBranchesPath + File.separator + currentBranch), revision);
 
     }
 
@@ -243,13 +243,17 @@ public class GitCommands {
     static void checkoutToBranch(String branchName) throws IOException, NoSuchAlgorithmException {
         setHead(branchName);
         clearWorkingDirectory();
-        String lastCommit = fileContentFromPath(Paths.get(gitBranchesPath.getFileName() + File.separator + branchName));
+        String lastCommit = fileContentFromPath(Paths.get(gitBranchesPath + File.separator + branchName));
         GitCommit gitCommit = loadCommit(new CommitHash(lastCommit));
-        setStaging(gitCommit.gitTree);
-        for (Map.Entry<String, InputStream> entry : gitCommit.gitTree.filesMap.entrySet()) {
-            String fileName = entry.getKey();
-            InputStream inputStream = entry.getValue();
-            writeToFile(Paths.get(fileName), stringFromInputStream(inputStream));
+        if (gitCommit == null){
+            setStaging(new GitTree());
+        } else{
+            setStaging(gitCommit.gitTree);
+            for (Map.Entry<String, InputStream> entry : gitCommit.gitTree.filesMap.entrySet()) {
+                String fileName = entry.getKey();
+                InputStream inputStream = entry.getValue();
+                writeToFile(Paths.get(fileName), stringFromInputStream(inputStream));
+            }
         }
     }
 
@@ -261,8 +265,8 @@ public class GitCommands {
      * @throws NoSuchAlgorithmException
      */
     static void createNewBranchAndCheckout(String branchName) throws IOException, NoSuchAlgorithmException {
-        Files.createFile(Paths.get(gitBranchesPath.getFileName() + File.separator + branchName));
-        writeToFile(Paths.get(gitBranchesPath.getFileName() + File.separator + branchName), "null");
+        Files.createFile(Paths.get(gitBranchesPath + File.separator + branchName));
+        writeToFile(Paths.get(gitBranchesPath + File.separator + branchName), "null");
         setStaging(new GitTree());
         checkoutToBranch(branchName);
         System.out.println("Switch to branch " + branchName);
@@ -276,7 +280,7 @@ public class GitCommands {
      * @throws NoSuchAlgorithmException
      */
     static void deleteBranchAndCheckoutToMaster(String branchName) throws IOException, NoSuchAlgorithmException {
-        Files.delete(Paths.get(gitBranchesPath.getFileName() + File.separator + branchName));
+        Files.delete(Paths.get(gitBranchesPath + File.separator + branchName));
         checkoutToBranch("master");
     }
 
@@ -285,7 +289,7 @@ public class GitCommands {
      *
      * @throws IOException
      */
-    public static void listBranches() throws IOException {
+    static void listBranches() throws IOException {
         System.out.println("List of branches: \n");
         Files.find(gitBranchesPath, 999, (p, bfa) -> bfa.isRegularFile())
                 .filter(p -> p.toFile().isFile()).forEach(p -> System.out.println(p.getFileName().toString()));
@@ -299,16 +303,18 @@ public class GitCommands {
      * @throws IOException
      * @throws NoSuchAlgorithmException
      */
-    public static void merge(String otherBranch) throws IOException, NoSuchAlgorithmException {
+    static void merge(String otherBranch) throws IOException, NoSuchAlgorithmException {
         GitCommit lastCommit = getLastCommit();
         GitTree lastCommitTree = lastCommit.gitTree;
         GitCommit otherBranchLastCommit = loadCommit(new CommitHash(fileContentFromPath(
-                Paths.get(gitBranchesPath.getFileName() + File.separator + otherBranch))));
+                Paths.get(gitBranchesPath + File.separator + otherBranch))));
         for (Map.Entry<String, InputStream> entry : otherBranchLastCommit.gitTree.filesMap.entrySet()) {
             String fileName = entry.getKey();
             InputStream inputStream = entry.getValue();
             if (lastCommitTree.filesMap.containsKey(fileName)) {
-                String currentString = stringFromInputStream(lastCommitTree.filesMap.get(fileName));
+                // TODO something wrong here
+                InputStream lastCommitFileNameInputStream = lastCommitTree.filesMap.get(fileName);
+                String currentString = stringFromInputStream(lastCommitFileNameInputStream);
                 String mergeString = stringFromInputStream(inputStream);
                 if (!currentString.equals(mergeString)) {
                     System.out.println("Merge conflict of file " + fileName + " in branches " + getHead() + " and " + otherBranch);

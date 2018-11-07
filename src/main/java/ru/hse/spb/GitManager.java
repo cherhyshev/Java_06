@@ -34,7 +34,7 @@ class GitManager {
 
     static String getLastCommitSHA() throws IOException, NoSuchAlgorithmException {
         GitCommit lastCommit = getLastCommit();
-        if (lastCommit == null){
+        if (lastCommit == null) {
             return null;
         }
         return saveCommit(lastCommit).sha1;
@@ -83,7 +83,7 @@ class GitManager {
         String treeString = stringFromInputStream(loadStream);
         GitTree gitTree = new GitTree();
 
-        if (!treeString.equals("")){
+        if (!treeString.equals("")) {
             Arrays.stream(treeString.split("\\n")).forEach(line -> {
                 int index = line.indexOf(' ');
                 String name = line.substring(0, index);
@@ -122,8 +122,8 @@ class GitManager {
     }
 
     static void clearWorkingDirectory() throws IOException {
-        Files.find(Paths.get(System.getProperty("user.dir")), 999, (p, bfa) -> bfa.isRegularFile())
-                .filter(path -> path.toFile().isFile())
+        Files.find(Paths.get(System.getProperty("user.dir")), 1, (p, bfa) -> bfa.isRegularFile())
+                .filter(path -> (path.toFile().isFile()))
                 .forEach(path1 -> {
                     try {
                         Files.deleteIfExists(path1);
