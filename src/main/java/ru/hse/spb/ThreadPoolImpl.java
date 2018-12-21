@@ -1,32 +1,31 @@
 package ru.hse.spb;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.Queue;
 import java.util.function.Supplier;
 
 public class ThreadPoolImpl<R> implements ThreadPool<R> {
-    private final List<Thread> threadList;
-    private final List<Runnable> taskList;
+    private final Queue<Thread> threadQueue;
+    private final Queue<Runnable> runnableQueue;
 
     public ThreadPoolImpl(int threadNum) {
-        threadList = new ArrayList<>(threadNum);
-        taskList = new LinkedList<>();
+        threadQueue = new ArrayDeque<>(threadNum);
+        runnableQueue = new ArrayDeque<>();
         for (int i = 0; i < threadNum; i++) {
 
-            threadList.add(new Thread(() -> {
+            threadQueue.add(new Thread(() -> {
                 while (!Thread.currentThread().isInterrupted()) {
                     Runnable nextTask = null;
-                    synchronized (taskList) {
-                        if (!taskList.isEmpty()) {
-                            nextTask = taskList.remove(0);
+                    synchronized (runnableQueue) {
+                        if (!runnableQueue.isEmpty()) {
+                            nextTask = runnableQueue.poll();
                         }
-                    }
-                    if (nextTask != null) {
-                        nextTask.run();
-                    }
-                    synchronized (taskList) {
+                        if (nextTask != null) {
+                            nextTask.run();
+                        }
                         try {
-                            if (taskList.isEmpty()) {
-                                taskList.wait();
+                            if (runnableQueue.isEmpty()) {
+                                runnableQueue.wait();
                             }
                         } catch (InterruptedException e) {
                             break;
@@ -36,16 +35,16 @@ public class ThreadPoolImpl<R> implements ThreadPool<R> {
             }));
         }
 
-        for (Thread tr : threadList) {
+        for (Thread tr : threadQueue) {
             tr.start();
         }
 
     }
 
     void addRunnable(Runnable runnable) {
-        synchronized (taskList) {
-            taskList.add(runnable);
-            taskList.notify();
+        synchronized (runnableQueue) {
+            runnableQueue.add(runnable);
+            runnableQueue.notify();
         }
     }
 
@@ -58,7 +57,7 @@ public class ThreadPoolImpl<R> implements ThreadPool<R> {
 
     @Override
     public void shutdown() {
-        for (Thread thread : threadList) {
+        for (Thread thread : threadQueue) {
             thread.interrupt();
         }
 

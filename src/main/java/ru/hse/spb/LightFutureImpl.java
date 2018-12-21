@@ -1,51 +1,53 @@
 package ru.hse.spb;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
 
 public class LightFutureImpl<R> implements LightFuture<R> {
     private final ThreadPoolImpl threadPool;
-    private volatile boolean ready;
-    private volatile R result;
-    private volatile Throwable throwable;
-    private Collection<Runnable> taskChildren;
+    private LightFutureImpl parent;
+    private boolean ready;
+    private R result;
+    private Throwable throwable;
+    private List<Runnable> taskChildren;
 
-    public <T> LightFutureImpl(ThreadPoolImpl threadPool, Callable<R> callable, LightFutureImpl<T> parent) {
+    public <T> LightFutureImpl(ThreadPoolImpl threadPool,
+                               Callable<R> callable,
+                               LightFutureImpl<T> parent) {
+
         this.threadPool = threadPool;
+        this.parent = parent;
         ready = false;
         taskChildren = new ArrayList<>();
         Runnable runnable = getRunnable(callable);
-        if (parent == null) {
+        handleParentFuture(runnable);
+    }
+
+    private synchronized void handleParentFuture(Runnable runnable) {
+        if (parent == null || parent.isReady()) {
             threadPool.addRunnable(runnable);
         } else {
-            synchronized (parent) {
-                if (parent.isReady()) {
-                    threadPool.addRunnable(runnable);
-                } else {
-                    parent.taskChildren.add(runnable);
-                }
-            }
+            parent.taskChildren.add(runnable);
         }
     }
 
     @Override
-    public boolean isReady() {
+    public synchronized boolean isReady() {
         return ready;
     }
 
     @Override
-    public R get() throws LightExecutionException {
+    public synchronized R get() throws LightExecutionException {
         while (true) {
-            synchronized (this) {
-                if (ready) {
-                    return getResult();
-                }
-                try {
-                    wait();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+            if (isReady()) {
+                return getResult();
+            }
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                throw new LightExecutionException(e.getMessage());
             }
         }
     }
@@ -62,7 +64,7 @@ public class LightFutureImpl<R> implements LightFuture<R> {
             } catch (Throwable t) {
                 setException(t);
             } finally {
-                setReady();
+                makeReady();
             }
             synchronized (this) {
                 notifyAll();
@@ -74,22 +76,22 @@ public class LightFutureImpl<R> implements LightFuture<R> {
         };
     }
 
-    private void setResult(R result) {
+    private synchronized void setResult(R result) {
         this.result = result;
     }
 
-    private void setReady() {
+    private synchronized void makeReady() {
         ready = true;
     }
 
-    private void setException(Throwable throwable) {
+    private synchronized void setException(Throwable throwable) {
         assert this.throwable == null;
         this.throwable = throwable;
     }
 
-    private R getResult() throws LightExecutionException {
+    private synchronized R getResult() throws LightExecutionException {
         if (throwable != null) {
-            throw new LightExecutionException();
+            throw new LightExecutionException(throwable.getMessage());
         }
         return result;
     }

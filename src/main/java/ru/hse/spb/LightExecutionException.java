@@ -1,4 +1,7 @@
 package ru.hse.spb;
 
-public class LightExecutionException extends RuntimeException{
+public class LightExecutionException extends InterruptedException {
+    public LightExecutionException(String s) {
+        super(s);
+    }
 }
