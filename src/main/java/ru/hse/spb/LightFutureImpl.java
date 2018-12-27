@@ -42,7 +42,11 @@ public class LightFutureImpl<R> implements LightFuture<R> {
     public synchronized R get() throws LightExecutionException {
         while (true) {
             if (isReady()) {
-                return getResult();
+                synchronized (this) {
+                    if (isReady()) {
+                        return getResult();
+                    }
+                }
             }
             try {
                 wait();
@@ -54,7 +58,16 @@ public class LightFutureImpl<R> implements LightFuture<R> {
 
     @Override
     public <T> LightFuture<T> thenApply(Function<? super R, ? extends T> function) {
-        return new LightFutureImpl<>(threadPool, () -> function.apply(get()), this);
+        while (true) {
+            if (isReady()) {
+                synchronized (this) {
+                    if (isReady()) {
+                        return new LightFutureImpl<>(threadPool, () -> function.apply(get()), this);
+                    }
+                }
+            }
+            Thread.yield();
+        }
     }
 
     private Runnable getRunnable(Callable<R> callable) {
